@@ -1,39 +1,70 @@
 import { Message } from "@/types";
 
-// Mock delay helper
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function sendMessage(content: string): Promise<Message> {
-  // Simulate API call
-  await delay(1500);
-  
+  const response = await fetch(`${API_URL}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message: content }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to send message");
+  }
+
+  const data = await response.json();
+
   return {
     id: Date.now().toString(),
-    role: 'assistant',
-    content: `I received your request: "${content}". I'm processing it with the MCP backend to update the document.`,
-    timestamp: new Date()
+    role: "assistant",
+    content: data.response,
+    timestamp: new Date(),
   };
 }
 
-export async function getLatestDocument(): Promise<string> {
-  // Simulate API call
-  await delay(1000);
+export async function getLatestDocument(): Promise<ArrayBuffer | null> {
+  // 1. Get list of documents
+  const listRes = await fetch(`${API_URL}/documents`);
+  if (!listRes.ok) throw new Error("Failed to fetch documents list");
 
-  // Mock HTML content (simulating mammoth output)
-  return `
-    <h2>Project Proposal: AI Integration</h2>
-    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-    <p><strong>Status:</strong> Draft (v${Math.floor(Math.random() * 10)})</p>
-    <h3>1. Executive Summary</h3>
-    <p>This document outlines the proposed integration of Artificial Intelligence into our existing workflow. The goal is to automate repetitive tasks and improve decision-making processes.</p>
-    <h3>2. Objectives</h3>
-    <ul>
-      <li>Reduce manual data entry by 50%</li>
-      <li>Provide real-time analytics</li>
-      <li>Enhance user experience with natural language interfaces</li>
-    </ul>
-    <h3>3. Timeline</h3>
-    <p>The project is expected to take 3 months to complete, starting from Q1 2026.</p>
-    <p><em>(Updated via MCP Backend)</em></p>
-  `;
+  const docs = await listRes.json();
+  if (!docs || docs.length === 0) return null;
+
+  // 2. Get the latest one (assuming ID increments or we sort by date)
+  // The API returns { id, filename, createdAt, ... }
+  // Let's sort by ID desc
+  const latestDoc = docs.sort((a: any, b: any) => b.id - a.id)[0];
+
+  // 3. Fetch content
+  const contentRes = await fetch(`${API_URL}/documents/${latestDoc.id}`);
+  if (!contentRes.ok) throw new Error("Failed to fetch document content");
+
+  return await contentRes.arrayBuffer();
+}
+
+export async function getLatestPdf(): Promise<Blob | null> {
+  // 1. Get list of documents
+  const listRes = await fetch(`${API_URL}/documents`);
+  if (!listRes.ok) throw new Error("Failed to fetch documents list");
+
+  const docs = await listRes.json();
+  if (!docs || docs.length === 0) return null;
+
+  // 2. Get the latest one
+  const latestDoc = docs.sort((a: any, b: any) => b.id - a.id)[0];
+
+  // 3. Fetch PDF content
+  const contentRes = await fetch(`${API_URL}/documents/${latestDoc.id}/pdf`);
+
+  if (contentRes.status === 404) {
+    // PDF might not be ready yet or failed
+    return null;
+  }
+
+  if (!contentRes.ok) throw new Error("Failed to fetch document PDF");
+
+  return await contentRes.blob();
 }
