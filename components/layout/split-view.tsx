@@ -7,7 +7,7 @@ interface SplitViewProps {
 
 export function SplitView({ left, right }: SplitViewProps) {
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-full w-full overflow-hidden bg-background">
       <div className="w-[40%] h-full border-r border-border flex flex-col">
         {left}
       </div>

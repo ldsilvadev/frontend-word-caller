@@ -6,7 +6,8 @@ export interface Message {
 }
 
 export interface Document {
-  id: string;
-  url: string;
-  lastModified: Date;
+  id: number;
+  filename: string;
+  publicUrl?: string | null;
+  createdAt?: string;
 }
