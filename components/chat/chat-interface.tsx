@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, Bot, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Message } from "@/types";
@@ -12,9 +12,13 @@ import { toast } from "sonner";
 
 interface ChatInterfaceProps {
   onMessageSuccess?: () => void;
+  onOpenDraft?: (id: number) => void;
 }
 
-export function ChatInterface({ onMessageSuccess }: ChatInterfaceProps) {
+export function ChatInterface({
+  onMessageSuccess,
+  onOpenDraft,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +28,21 @@ export function ChatInterface({ onMessageSuccess }: ChatInterfaceProps) {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+
+    // Auto-detect draft in the last message
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === "assistant" && onOpenDraft) {
+      const match = lastMessage.content.match(/ID\s*:?\s*\**(\d+)\**/i);
+      if (match && match[1]) {
+        console.log("ChatInterface: Auto-detecting draft ID:", match[1]);
+        // We found a draft ID. We should probably only open it if it's a *new* message.
+        // For now, let's just open it. The parent can handle dedup or we can check if it's already open.
+        // To avoid infinite loops or re-opening, we might need to track if we've opened this message's draft.
+        // But since onOpenDraft just sets state in parent, it's likely fine (React state update dedup).
+        onOpenDraft(parseInt(match[1]));
+      }
+    }
+  }, [messages, onOpenDraft]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -103,11 +121,40 @@ export function ChatInterface({ onMessageSuccess }: ChatInterfaceProps) {
                   }`}
                 >
                   {message.content}
+                  {message.role === "assistant" &&
+                    (message.content.includes("Draft created") ||
+                      message.content.match(/ID\s*:?\s*\**\d+\**/i)) && (
+                      <div className="mt-2">
+                        {(() => {
+                          const match = message.content.match(
+                            /ID\s*:?\s*\**(\d+)\**/i
+                          );
+                          if (match && match[1]) {
+                            return (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                  console.log(
+                                    "ChatInterface: Button clicked for draft ID:",
+                                    match[1]
+                                  );
+                                  onOpenDraft?.(parseInt(match[1]));
+                                }}
+                              >
+                                Open Draft #{match[1]}
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
                 </div>
               </div>
             ))
           )}
-          
+
           {isLoading && (
             <div className="flex gap-4">
               <Avatar className="w-8 h-8 border shadow-sm">
@@ -129,17 +176,20 @@ export function ChatInterface({ onMessageSuccess }: ChatInterfaceProps) {
       <div className="p-4 pb-8">
         <div className="max-w-3xl mx-auto relative">
           <div className="relative flex items-end bg-white rounded-3xl shadow-md border border-gray-200 px-4 py-2 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-            <Textarea
+            <Input
               placeholder="Digite sua pergunta aqui..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
-              className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent text-gray-700 placeholder:text-gray-400 min-h-[44px] max-h-[400px] resize-none py-3"
-              rows={1}
+              className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent text-gray-700 placeholder:text-gray-400 h-11 py-3"
             />
             <div className="flex items-center gap-2 ml-2 mb-1">
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-blue-600 rounded-full h-8 w-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-gray-400 hover:text-blue-600 rounded-full h-8 w-8"
+              >
                 <Paperclip className="w-4 h-4" />
               </Button>
               <Button
@@ -153,9 +203,7 @@ export function ChatInterface({ onMessageSuccess }: ChatInterfaceProps) {
               </Button>
             </div>
           </div>
-          <div className="text-center mt-2 text-xs text-gray-400">
-            v 1.10.0
-          </div>
+          <div className="text-center mt-2 text-xs text-gray-400">v 1.10.0</div>
         </div>
       </div>
     </div>

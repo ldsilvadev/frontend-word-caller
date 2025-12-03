@@ -1,4 +1,4 @@
-import { Message, Document } from "@/types";
+import { Message, Document, Draft } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -68,4 +68,32 @@ export async function getLatestPdf(): Promise<Blob | null> {
   if (!contentRes.ok) throw new Error("Failed to fetch document PDF");
 
   return await contentRes.blob();
+}
+
+export async function getDraft(id: number): Promise<Draft> {
+  const response = await fetch(`${API_URL}/drafts/${id}`);
+  if (!response.ok) throw new Error("Failed to fetch draft");
+  return await response.json();
+}
+
+export async function updateDraft(id: number, content: any): Promise<Draft> {
+  const response = await fetch(`${API_URL}/drafts/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content }),
+  });
+  if (!response.ok) throw new Error("Failed to update draft");
+  return await response.json();
+}
+
+export async function generateDocument(
+  id: number
+): Promise<{ result: string; filename: string }> {
+  const response = await fetch(`${API_URL}/drafts/${id}/generate`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to generate document");
+  return await response.json();
 }
