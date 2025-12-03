@@ -2,13 +2,38 @@ import { Message, Document, Draft } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-export async function sendMessage(content: string): Promise<Message> {
+export interface SendMessageResponse extends Message {
+  draftUpdated?: boolean;
+  updatedDraftId?: number;
+}
+
+interface EditorContent {
+  markdown: string;
+  metadata: {
+    assunto: string;
+    codigo: string;
+    departamento: string;
+    revisao: string;
+    data_publicacao: string;
+    data_vigencia: string;
+  };
+}
+
+export async function sendMessage(
+  content: string, 
+  activeDraftId?: number | null,
+  currentEditorContent?: EditorContent | null
+): Promise<SendMessageResponse> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message: content }),
+    body: JSON.stringify({ 
+      message: content,
+      activeDraftId: activeDraftId || null,
+      currentEditorContent: currentEditorContent || null,
+    }),
   });
 
   if (!response.ok) {
@@ -22,6 +47,8 @@ export async function sendMessage(content: string): Promise<Message> {
     role: "assistant",
     content: data.response,
     timestamp: new Date(),
+    draftUpdated: data.draftUpdated || false,
+    updatedDraftId: data.updatedDraftId || null,
   };
 }
 
@@ -95,5 +122,15 @@ export async function generateDocument(
     method: "POST",
   });
   if (!response.ok) throw new Error("Failed to generate document");
+  return await response.json();
+}
+
+export async function publishDraft(
+  id: number
+): Promise<{ result: string; filename: string; sharePointLink: string | null }> {
+  const response = await fetch(`${API_URL}/drafts/${id}/publish`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to publish draft");
   return await response.json();
 }
