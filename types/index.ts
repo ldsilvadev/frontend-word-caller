@@ -13,44 +13,33 @@ export interface Document {
 }
 
 export interface DraftMetadata {
-  assunto?: string;
-  codigo?: string;
-  departamento?: string;
-  revisao?: string;
-  data_publicacao?: string;
-  data_vigencia?: string;
+  assunto: string;
+  codigo: string;
+  departamento: string;
+  revisao: string;
+  data_publicacao: string;
+  data_vigencia: string;
 }
 
-export interface DraftSection {
-  titulo?: string;
-  title?: string;
-  paragrafo?: string;
-  content?: string;
-  texto?: string;
-  conteudo?: string;
-  tabela_dinamica?: Record<string, unknown>;
-  items?: string[] | Record<string, unknown>[];
-  itens?: string[] | Record<string, unknown>[];
-  subsections?: DraftSection[];
-  subsecoes?: DraftSection[];
-}
-
+/**
+ * ARQUITETURA SIMPLIFICADA:
+ * - Draft no banco = metadados + caminho do arquivo .docx
+ * - Arquivo .docx = fonte única de verdade
+ * - OnlyOffice edita o arquivo diretamente
+ * - IA modifica o arquivo via MCP
+ */
 export interface DraftContent {
-  assunto?: string;
-  codigo?: string;
-  departamento?: string;
-  revisao?: string;
-  data_publicacao?: string;
-  data_vigencia?: string;
-  sections?: DraftSection[];
-  secao?: DraftSection[];
-  secoes?: DraftSection[];
-  markdownContent?: string; // Novo formato com markdown direto
+  // Caminho do arquivo .docx (relativo ao OUTPUT_DIR)
+  filePath: string;
+  // Metadados do documento
+  metadata: DraftMetadata;
+  // Timestamp da última modificação
+  lastModified?: string;
 }
 
 export interface Draft {
   id: number;
   title: string;
-  content: DraftContent | string;
-  status: "draft" | "generated";
+  content: DraftContent;
+  status: "draft" | "published";
 }

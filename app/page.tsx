@@ -11,23 +11,21 @@ export default function Home() {
   const editorRef = useRef<DocumentEditorRef>(null);
 
   const handleOpenDraft = useCallback((id: number) => {
-    console.log("Home: handleOpenDraft called with ID:", id);
+    console.log("Home: Opening draft ID:", id);
     setActiveDraftId(id);
   }, []);
 
-  // Chamado quando a IA cria ou atualiza o draft - recarrega o editor ou abre o draft
+  // Chamado quando a IA cria ou atualiza o draft
   const handleDraftUpdated = useCallback((draftId: number) => {
     console.log("Home: Draft updated/created, ID:", draftId, "Active:", activeDraftId);
     
     if (activeDraftId === draftId) {
-      // Draft ativo foi atualizado - recarregar
-      if (editorRef.current) {
-        console.log("Home: Reloading existing draft");
-        editorRef.current.reloadDraft();
-      }
+      // Draft ativo foi atualizado - recarregar o OnlyOffice
+      console.log("Home: Reloading document in OnlyOffice");
+      editorRef.current?.reloadDocument();
     } else {
-      // Novo draft ou draft diferente - abrir no editor
-      console.log("Home: Opening new/different draft");
+      // Novo draft - abrir no editor
+      console.log("Home: Opening new draft");
       setActiveDraftId(draftId);
     }
   }, [activeDraftId]);
@@ -40,7 +38,6 @@ export default function Home() {
             onOpenDraft={handleOpenDraft} 
             onDraftUpdated={handleDraftUpdated}
             activeDraftId={activeDraftId}
-            getEditorContent={() => editorRef.current?.getCurrentContent() || null}
           />
         }
         right={
@@ -48,8 +45,8 @@ export default function Home() {
             <DocumentEditor
               ref={editorRef}
               draftId={activeDraftId}
-              onGenerateSuccess={() => {
-                // Optional: maybe close editor or show success message
+              onPublishSuccess={() => {
+                console.log("Document published successfully");
               }}
             />
           ) : (

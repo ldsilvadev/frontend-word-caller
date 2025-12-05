@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Message } from "@/types";
-import { sendMessage } from "@/lib/api";
+import { sendMessage, getDraftStatus } from "@/lib/api";
 import { toast } from "sonner";
 
 interface EditorContent {
@@ -88,13 +88,66 @@ export function ChatInterface({
     }
   }, [messages, onOpenDraft, openedDraftIds]);
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+  // Estado para controlar o diálogo de confirmação
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+
+  // Palavras-chave que indicam modificação de conteúdo
+  const isModificationRequest = (text: string): boolean => {
+    const keywords = [
+      "mude", "altere", "modifique", "edite", "troque", "substitua",
+      "adicione", "inclua", "insira", "remova", "exclua", "delete",
+      "corrija", "ajuste", "melhore", "atualize", "crie", "escreva",
+      "change", "modify", "edit", "update", "add", "remove", "fix", "create", "write",
+    ];
+    const lower = text.toLowerCase();
+    return keywords.some((kw) => lower.includes(kw));
+  };
+
+  const handleSendMessage = async (forceMessage?: string) => {
+    // Garantir que messageToSend é sempre uma string
+    const messageToSend = typeof forceMessage === "string" ? forceMessage : inputValue;
+    if (!messageToSend || !messageToSend.trim()) return;
+
+    // Se há um draft ativo e é uma solicitação de modificação, verificar se foi editado manualmente
+    if (activeDraftId && isModificationRequest(messageToSend) && typeof forceMessage !== "string") {
+      try {
+        const status = await getDraftStatus(activeDraftId);
+        if (status.manuallyEdited) {
+          // Salvar mensagem para usar depois da confirmação
+          const savedMessage = messageToSend;
+          setPendingMessage(savedMessage);
+          toast.warning(
+            "⚠️ Você editou o documento manualmente. Modificações da IA vão regenerar o documento e podem perder formatações personalizadas (cores, fontes, etc).",
+            {
+              duration: 10000,
+              action: {
+                label: "Continuar mesmo assim",
+                onClick: () => {
+                  setPendingMessage(null);
+                  handleSendMessage(savedMessage);
+                },
+              },
+              cancel: {
+                label: "Cancelar",
+                onClick: () => {
+                  setPendingMessage(null);
+                  setInputValue(messageToSend);
+                },
+              },
+            }
+          );
+          setInputValue("");
+          return;
+        }
+      } catch (error) {
+        console.error("Erro ao verificar status do draft:", error);
+      }
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: inputValue,
+      content: messageToSend,
       timestamp: new Date(),
     };
 

@@ -1,173 +1,191 @@
 "use client";
 
-import { useState, useRef, forwardRef, useImperativeHandle, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { OnlyOfficeEditor, OnlyOfficeEditorRef } from "./OnlyOfficeEditor";
+import { getDraftStatus, publishDraft, DraftStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { FileUp, Loader2, ExternalLink, RefreshCw } from "lucide-react";
+import { Loader2, Upload, RefreshCw, FileText, Clock, Download, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { publishDraft, getDraft } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-interface DocumentMetadata {
-  assunto: string;
-  codigo: string;
-  departamento: string;
-  revisao: string;
-  data_publicacao: string;
-  data_vigencia: string;
-}
-
 export interface DocumentEditorRef {
-  reloadDraft: () => Promise<void>;
-  getCurrentContent: () => { markdown: string; metadata: DocumentMetadata } | null;
+  reloadDocument: () => Promise<void>;
 }
 
 interface DocumentEditorProps {
   draftId: number;
-  onGenerateSuccess?: () => void;
+  onPublishSuccess?: () => void;
 }
 
 export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>(
-  function DocumentEditor({ draftId, onGenerateSuccess }, ref) {
+  function DocumentEditor({ draftId, onPublishSuccess }, ref) {
+    const [status, setStatus] = useState<DraftStatus | null>(null);
+    const [loading, setLoading] = useState(true);
     const [publishing, setPublishing] = useState(false);
-    const [sharePointLink, setSharePointLink] = useState<string | null>(null);
-    const [draftTitle, setDraftTitle] = useState<string>("");
-    const [onlyOfficeAvailable, setOnlyOfficeAvailable] = useState<boolean | null>(null);
+    const [isReloading, setIsReloading] = useState(false);
+    const [publishedInfo, setPublishedInfo] = useState<{ filename: string; downloadUrl?: string } | null>(null);
     
     const onlyOfficeRef = useRef<OnlyOfficeEditorRef>(null);
 
-    // Carregar informações do draft
+    // Carregar status do draft
+    const loadStatus = async () => {
+      try {
+        const data = await getDraftStatus(draftId);
+        setStatus(data);
+      } catch (error) {
+        console.error("Error loading draft status:", error);
+        toast.error("Erro ao carregar status do documento");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     useEffect(() => {
-      const loadDraftInfo = async () => {
-        try {
-          const draft = await getDraft(draftId);
-          setDraftTitle(draft.title);
-        } catch {
-          console.error("Failed to load draft info");
-        }
-      };
-      loadDraftInfo();
+      loadStatus();
     }, [draftId]);
 
-    // Verificar disponibilidade do OnlyOffice
-    useEffect(() => {
-      const checkOnlyOffice = async () => {
-        try {
-          const response = await fetch(`${API_URL}/onlyoffice/status`);
-          const data = await response.json();
-          setOnlyOfficeAvailable(data.available);
-        } catch {
-          setOnlyOfficeAvailable(false);
-        }
-      };
-      checkOnlyOffice();
-    }, []);
+    // Expor método de reload
+    useImperativeHandle(ref, () => ({
+      reloadDocument: async () => {
+        setIsReloading(true);
+        toast.info("Recarregando documento...");
+        
+        // Recarregar o OnlyOffice
+        await onlyOfficeRef.current?.reloadDocument();
+        
+        // Atualizar status
+        await loadStatus();
+        
+        setIsReloading(false);
+        toast.success("Documento recarregado!");
+      },
+    }), []);
 
-    // Publicar documento (gerar Word final e enviar para SharePoint)
-    const handlePublish = useCallback(async () => {
+    // Publicar documento
+    const handlePublish = async () => {
       try {
         setPublishing(true);
-        toast.info("Gerando documento Word e enviando para SharePoint...");
-        
         const result = await publishDraft(draftId);
-        
-        if (result.sharePointLink) {
-          setSharePointLink(result.sharePointLink);
-          toast.success("Documento publicado com sucesso!", {
-            description: "O documento foi enviado para o SharePoint",
-            action: {
-              label: "Abrir",
-              onClick: () => window.open(result.sharePointLink!, "_blank"),
-            },
-          });
-        } else {
-          toast.success("Documento gerado!", {
-            description: `Arquivo: ${result.filename}`,
-          });
-        }
-        
-        onGenerateSuccess?.();
+        setPublishedInfo({
+          filename: result.filename,
+          downloadUrl: result.downloadUrl,
+        });
+        toast.success("Documento publicado!", {
+          description: `Arquivo: ${result.filename}`,
+        });
+        onPublishSuccess?.();
+        await loadStatus();
       } catch (error) {
-        console.error("Publish error:", error);
+        console.error("Error publishing:", error);
         toast.error("Erro ao publicar documento");
       } finally {
         setPublishing(false);
       }
-    }, [draftId, onGenerateSuccess]);
+    };
 
-    // Expor métodos via ref
-    useImperativeHandle(ref, () => ({
-      reloadDraft: async () => {
-        if (onlyOfficeRef.current) {
-          await onlyOfficeRef.current.reloadDocument();
-        }
-      },
-      getCurrentContent: () => {
-        // OnlyOffice salva automaticamente no servidor
-        // O backend pega o conteúdo do arquivo salvo
-        return null;
-      },
-    }), []);
+    // Download do documento publicado
+    const handleDownload = () => {
+      const downloadUrl = `${API_URL}/drafts/${draftId}/download`;
+      window.open(downloadUrl, "_blank");
+    };
+
+    // Recarregar documento
+    const handleReload = async () => {
+      setIsReloading(true);
+      await onlyOfficeRef.current?.reloadDocument();
+      await loadStatus();
+      setIsReloading(false);
+    };
+
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      );
+    }
+
+    if (!status) {
+      return (
+        <div className="flex items-center justify-center h-full text-gray-500">
+          Documento não encontrado
+        </div>
+      );
+    }
 
     return (
       <div className="flex flex-col h-full">
-        {/* Header com título e botão de publicar */}
-        <div className="bg-white border-b px-4 py-3 flex items-center justify-between shadow-sm">
+        {/* Header */}
+        <div className={`bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm ${isReloading ? "bg-blue-50 border-blue-200" : ""}`}>
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-gray-800 truncate max-w-md">
-              {draftTitle || "Carregando..."}
+            <FileText className="h-5 w-5 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-800 truncate">
+              {status.title}
             </h2>
-            {onlyOfficeAvailable === false && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                OnlyOffice offline
+            
+            {status.lastModified && (
+              <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                <Clock className="h-3 w-3" />
+                {new Date(status.lastModified).toLocaleString("pt-BR")}
+              </span>
+            )}
+            
+            {isReloading && (
+              <span className="flex items-center gap-1.5 text-sm text-blue-600 bg-blue-100 px-2 py-0.5 rounded animate-pulse">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Atualizando...
               </span>
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            {sharePointLink && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(sharePointLink, "_blank")}
-                className="text-green-600 border-green-200 hover:bg-green-50"
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Abrir no SharePoint
-              </Button>
-            )}
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onlyOfficeRef.current?.reloadDocument()}
-              disabled={publishing}
+          <div className="flex gap-2 items-center">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleReload}
+              disabled={isReloading}
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar
+              <RefreshCw className={`mr-2 h-4 w-4 ${isReloading ? "animate-spin" : ""}`} />
+              Recarregar
             </Button>
             
-            <Button
-              size="sm"
+            <Button 
+              size="sm" 
               onClick={handlePublish}
-              disabled={publishing}
-              className="bg-blue-600 hover:bg-blue-700"
+              disabled={publishing || isReloading}
             >
               {publishing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Publicando...
-                </>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <FileUp className="mr-2 h-4 w-4" />
-                  Gerar Word Final
-                </>
+                <Upload className="mr-2 h-4 w-4" />
               )}
+              Exportar
             </Button>
+
+            {(status?.status === "published" || publishedInfo) && (
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={handleDownload}
+                className="bg-green-100 hover:bg-green-200 text-green-700"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Baixar
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Metadata */}
+        {status.metadata && (
+          <div className="bg-gray-50 border-b px-4 py-2 flex gap-4 text-xs text-gray-600">
+            <span><strong>Código:</strong> {status.metadata.codigo}</span>
+            <span><strong>Departamento:</strong> {status.metadata.departamento}</span>
+            <span><strong>Revisão:</strong> {status.metadata.revisao}</span>
+            <span><strong>Vigência:</strong> {status.metadata.data_vigencia}</span>
+          </div>
+        )}
 
         {/* OnlyOffice Editor */}
         <div className="flex-1 overflow-hidden">
@@ -175,10 +193,11 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
             ref={onlyOfficeRef}
             draftId={draftId}
             onSave={() => {
-              // Salvo automaticamente pelo OnlyOffice
+              toast.success("Documento salvo!");
+              loadStatus();
             }}
             onError={(error) => {
-              toast.error("Erro no editor", { description: error });
+              toast.error(`Erro: ${error}`);
             }}
           />
         </div>
@@ -186,3 +205,5 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
     );
   }
 );
+
+export default DocumentEditor;

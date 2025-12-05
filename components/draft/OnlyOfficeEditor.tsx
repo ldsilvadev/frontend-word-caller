@@ -57,7 +57,6 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
     const editorIdRef = useRef(`oo-editor-${Date.now()}`);
     const initAttemptRef = useRef(0);
 
-    // Destruir editor
     const destroyEditor = useCallback(() => {
       if (editorInstanceRef.current) {
         try {
@@ -67,13 +66,11 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
         }
         editorInstanceRef.current = null;
       }
-      // Limpar container
       if (editorContainerRef.current) {
         editorContainerRef.current.innerHTML = "";
       }
     }, []);
 
-    // Recarregar
     const reload = useCallback(() => {
       destroyEditor();
       editorIdRef.current = `oo-editor-${Date.now()}`;
@@ -81,11 +78,9 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
       setReady(false);
       setLoading(true);
       setError(null);
-      // Força re-render
       setTimeout(() => setReady(true), 50);
     }, [destroyEditor]);
 
-    // Expor via ref
     useImperativeHandle(ref, () => ({
       reloadDocument: async () => {
         toast.info("Recarregando documento...");
@@ -93,15 +88,11 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
       },
     }), [reload]);
 
-    // Marcar como pronto após montar
     useEffect(() => {
       setReady(true);
-      return () => {
-        destroyEditor();
-      };
+      return () => destroyEditor();
     }, [destroyEditor]);
 
-    // Inicializar editor quando pronto
     useEffect(() => {
       if (!ready) return;
 
@@ -158,7 +149,7 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
                 }, 100);
                 setTimeout(() => {
                   clearInterval(checkInterval);
-                  resolve(); // Resolve anyway
+                  resolve();
                 }, 3000);
               };
               script.onerror = () => reject(new Error("Failed to load script"));
@@ -175,14 +166,9 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
 
           if (cancelled) return;
 
-          // Verificar se container existe
           const container = editorContainerRef.current;
-          if (!container) {
-            console.error("[OnlyOffice] Container ref not available");
-            return;
-          }
+          if (!container) return;
 
-          // Criar div para o editor dentro do container
           const editorDiv = document.createElement("div");
           editorDiv.id = editorIdRef.current;
           editorDiv.style.width = "100%";
@@ -192,7 +178,6 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
 
           if (cancelled) return;
 
-          // Criar editor
           if (window.DocsAPI) {
             const fullConfig = {
               ...config,
@@ -224,7 +209,6 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
               fullConfig
             );
             
-            // Fallback loading
             timeoutId = setTimeout(() => {
               if (!cancelled) setLoading(false);
             }, 5000);

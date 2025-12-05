@@ -7,32 +7,16 @@ export interface SendMessageResponse extends Message {
   updatedDraftId?: number;
 }
 
-interface EditorContent {
-  markdown: string;
-  metadata: {
-    assunto: string;
-    codigo: string;
-    departamento: string;
-    revisao: string;
-    data_publicacao: string;
-    data_vigencia: string;
-  };
-}
-
 export async function sendMessage(
   content: string, 
-  activeDraftId?: number | null,
-  currentEditorContent?: EditorContent | null
+  activeDraftId?: number | null
 ): Promise<SendMessageResponse> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ 
       message: content,
       activeDraftId: activeDraftId || null,
-      currentEditorContent: currentEditorContent || null,
     }),
   });
 
@@ -57,44 +41,18 @@ export async function getDocuments(): Promise<Document[]> {
   if (!listRes.ok) throw new Error("Failed to fetch documents list");
 
   const docs = await listRes.json();
-  // Sort by ID desc (newest first)
-  return docs.sort((a: any, b: any) => b.id - a.id);
+  return docs.sort((a: Document, b: Document) => b.id - a.id);
 }
 
 export async function getLatestDocument(): Promise<ArrayBuffer | null> {
-  // 1. Get list of documents
   const docs = await getDocuments();
   if (!docs || docs.length === 0) return null;
 
-  // 2. Get the latest one
   const latestDoc = docs[0];
-
-  // 3. Fetch content
   const contentRes = await fetch(`${API_URL}/documents/${latestDoc.id}`);
   if (!contentRes.ok) throw new Error("Failed to fetch document content");
 
   return await contentRes.arrayBuffer();
-}
-
-export async function getLatestPdf(): Promise<Blob | null> {
-  // 1. Get list of documents
-  const docs = await getDocuments();
-  if (!docs || docs.length === 0) return null;
-
-  // 2. Get the latest one
-  const latestDoc = docs[0];
-
-  // 3. Fetch PDF content
-  const contentRes = await fetch(`${API_URL}/documents/${latestDoc.id}/pdf`);
-
-  if (contentRes.status === 404) {
-    // PDF might not be ready yet or failed
-    return null;
-  }
-
-  if (!contentRes.ok) throw new Error("Failed to fetch document PDF");
-
-  return await contentRes.blob();
 }
 
 export async function getDraft(id: number): Promise<Draft> {
@@ -103,31 +61,33 @@ export async function getDraft(id: number): Promise<Draft> {
   return await response.json();
 }
 
-export async function updateDraft(id: number, content: any): Promise<Draft> {
-  const response = await fetch(`${API_URL}/drafts/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ content }),
-  });
-  if (!response.ok) throw new Error("Failed to update draft");
-  return await response.json();
+export interface DraftStatus {
+  id: number;
+  title: string;
+  status: string;
+  filePath: string | null;
+  fileExists: boolean;
+  fileModifiedAt: string | null;
+  lastModified: string | null;
+  metadata: {
+    assunto: string;
+    codigo: string;
+    departamento: string;
+    revisao: string;
+    data_publicacao: string;
+    data_vigencia: string;
+  } | null;
 }
 
-export async function generateDocument(
-  id: number
-): Promise<{ result: string; filename: string }> {
-  const response = await fetch(`${API_URL}/drafts/${id}/generate`, {
-    method: "POST",
-  });
-  if (!response.ok) throw new Error("Failed to generate document");
+export async function getDraftStatus(id: number): Promise<DraftStatus> {
+  const response = await fetch(`${API_URL}/drafts/${id}/status`);
+  if (!response.ok) throw new Error("Failed to fetch draft status");
   return await response.json();
 }
 
 export async function publishDraft(
   id: number
-): Promise<{ result: string; filename: string; sharePointLink: string | null }> {
+): Promise<{ result: string; filename: string; downloadUrl: string | null }> {
   const response = await fetch(`${API_URL}/drafts/${id}/publish`, {
     method: "POST",
   });
