@@ -33,6 +33,14 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
       try {
         const data = await getDraftStatus(draftId);
         setStatus(data);
+        
+        // Se já está publicado, carregar info de publicação
+        if (data.status === "published") {
+          setPublishedInfo({
+            filename: data.filePath?.split("/").pop() || "documento.docx",
+            downloadUrl: undefined,
+          });
+        }
       } catch (error) {
         console.error("Error loading draft status:", error);
         toast.error("Erro ao carregar status do documento");
@@ -42,25 +50,28 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
     };
 
     useEffect(() => {
+      setPublishedInfo(null); // Reset ao mudar de draft
       loadStatus();
     }, [draftId]);
 
-    // Expor método de reload
+    // Expor método de reload (só funciona se não estiver publicado)
     useImperativeHandle(ref, () => ({
       reloadDocument: async () => {
+        if (status?.status === "published" || publishedInfo) {
+          console.log("[DocumentEditor] Documento já publicado, ignorando reload");
+          return;
+        }
+        
         setIsReloading(true);
         toast.info("Recarregando documento...");
         
-        // Recarregar o OnlyOffice
         await onlyOfficeRef.current?.reloadDocument();
-        
-        // Atualizar status
         await loadStatus();
         
         setIsReloading(false);
         toast.success("Documento recarregado!");
       },
-    }), []);
+    }), [status?.status, publishedInfo]);
 
     // Publicar documento
     const handlePublish = async () => {
@@ -69,16 +80,16 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
         const result = await publishDraft(draftId);
         setPublishedInfo({
           filename: result.filename,
-          downloadUrl: result.downloadUrl,
+          downloadUrl: result?.downloadUrl,
         });
-        toast.success("Documento publicado!", {
+        toast.success("Documento exportado com sucesso!", {
           description: `Arquivo: ${result.filename}`,
         });
         onPublishSuccess?.();
         await loadStatus();
       } catch (error) {
         console.error("Error publishing:", error);
-        toast.error("Erro ao publicar documento");
+        toast.error("Erro ao exportar documento");
       } finally {
         setPublishing(false);
       }
@@ -86,8 +97,15 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
 
     // Download do documento publicado
     const handleDownload = () => {
-      const downloadUrl = `${API_URL}/drafts/${draftId}/download`;
-      window.open(downloadUrl, "_blank");
+      // Prioridade: downloadUrl do status > downloadUrl do publishedInfo > endpoint de download
+      if (status?.downloadUrl) {
+        window.open(status.downloadUrl, "_blank");
+      } else if (publishedInfo?.downloadUrl) {
+        window.open(publishedInfo.downloadUrl, "_blank");
+      } else {
+        const downloadUrl = `${API_URL}/drafts/${draftId}/download`;
+        window.open(downloadUrl, "_blank");
+      }
     };
 
     // Recarregar documento
@@ -114,6 +132,70 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
       );
     }
 
+    // Se o documento foi publicado, mostrar tela de sucesso com botão de download
+    const isPublished = status.status === "published" || publishedInfo;
+    
+    if (isPublished) {
+      return (
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="bg-white border-b px-4 py-3 flex justify-between items-center shadow-sm">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <h2 className="text-lg font-semibold text-gray-800 truncate">
+                {status.title}
+              </h2>
+              <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded font-medium">
+                Exportado
+              </span>
+            </div>
+          </div>
+
+          {/* Metadata */}
+          {status.metadata && (
+            <div className="bg-gray-50 border-b px-4 py-2 flex gap-4 text-xs text-gray-600">
+              <span><strong>Código:</strong> {status.metadata.codigo}</span>
+              <span><strong>Departamento:</strong> {status.metadata.departamento}</span>
+              <span><strong>Revisão:</strong> {status.metadata.revisao}</span>
+              <span><strong>Vigência:</strong> {status.metadata.data_vigencia}</span>
+            </div>
+          )}
+
+          {/* Conteúdo - Tela de documento exportado */}
+          <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-b from-green-50 to-white p-8">
+            <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="h-10 w-10 text-green-600" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                Documento Exportado!
+              </h3>
+              
+              <p className="text-gray-600 mb-6">
+                O documento foi exportado com sucesso e está disponível para download.
+              </p>
+
+
+              <Button 
+                size="lg"
+                onClick={handleDownload}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Download className="mr-2 h-5 w-5" />
+                Baixar Documento
+              </Button>
+
+              <p className="text-xs text-gray-400 mt-4">
+                O documento está armazenado na nuvem e pode ser baixado a qualquer momento.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Documento ainda não publicado - mostrar editor OnlyOffice
     return (
       <div className="flex flex-col h-full">
         {/* Header */}
@@ -162,18 +244,6 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
               )}
               Exportar
             </Button>
-
-            {(status?.status === "published" || publishedInfo) && (
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={handleDownload}
-                className="bg-green-100 hover:bg-green-200 text-green-700"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Baixar
-              </Button>
-            )}
           </div>
         </div>
 

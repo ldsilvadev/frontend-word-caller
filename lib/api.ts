@@ -9,7 +9,8 @@ export interface SendMessageResponse extends Message {
 
 export async function sendMessage(
   content: string, 
-  activeDraftId?: number | null
+  activeDraftId?: number | null,
+  editorContent?: any
 ): Promise<SendMessageResponse> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
@@ -17,6 +18,7 @@ export async function sendMessage(
     body: JSON.stringify({ 
       message: content,
       activeDraftId: activeDraftId || null,
+      editorContent: editorContent || null,
     }),
   });
 
@@ -69,6 +71,8 @@ export interface DraftStatus {
   fileExists: boolean;
   fileModifiedAt: string | null;
   lastModified: string | null;
+  downloadUrl?: string | null;
+  publishedAt?: string | null;
   metadata: {
     assunto: string;
     codigo: string;
@@ -92,5 +96,29 @@ export async function publishDraft(
     method: "POST",
   });
   if (!response.ok) throw new Error("Failed to publish draft");
+  return await response.json();
+}
+
+export interface UploadDocumentResponse {
+  success: boolean;
+  draftId: number;
+  filename: string;
+  message: string;
+}
+
+export async function uploadDocument(file: File): Promise<UploadDocumentResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_URL}/drafts/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to upload document");
+  }
+
   return await response.json();
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Bot, User } from "lucide-react";
+import { Send, Paperclip, Bot, User, FileUp, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Message } from "@/types";
-import { sendMessage, getDraftStatus } from "@/lib/api";
+import { sendMessage, getDraftStatus, uploadDocument } from "@/lib/api";
 import { toast } from "sonner";
 
 interface EditorContent {
@@ -40,24 +40,26 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Track which draft IDs we've already opened to avoid re-opening
   const [openedDraftIds, setOpenedDraftIds] = useState<Set<string>>(new Set());
 
   // Helper function to extract draft ID from message content
   const extractDraftId = (content: string): number | null => {
-    // Try multiple patterns to find draft ID
     const patterns = [
-      /ID\s*:?\s*\**(\d+)\**/i,                    // ID: 123 or ID **123**
-      /draft[_\s-]*id\s*:?\s*\**(\d+)\**/i,        // draft_id: 123, draft-id: 123
-      /rascunho[_\s-]*id\s*:?\s*\**(\d+)\**/i,     // rascunho_id: 123 (Portuguese)
-      /#(\d+)/,                                     // #123
-      /draft\s*#?\s*(\d+)/i,                       // draft #123 or draft 123
-      /rascunho\s*#?\s*(\d+)/i,                    // rascunho #123 (Portuguese)
-      /"id"\s*:\s*(\d+)/i,                         // "id": 123 (JSON format)
-      /criado.*?(\d+)/i,                           // criado com sucesso... 123
-      /created.*?(\d+)/i,                          // created... 123
+      /ID\s*:?\s*\**(\d+)\**/i,
+      /draft[_\s-]*id\s*:?\s*\**(\d+)\**/i,
+      /rascunho[_\s-]*id\s*:?\s*\**(\d+)\**/i,
+      /#(\d+)/,
+      /draft\s*#?\s*(\d+)/i,
+      /rascunho\s*#?\s*(\d+)/i,
+      /"id"\s*:\s*(\d+)/i,
+      /criado.*?(\d+)/i,
+      /created.*?(\d+)/i,
     ];
 
     for (const pattern of patterns) {
@@ -74,7 +76,6 @@ export function ChatInterface({
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
 
-    // Auto-detect draft in the last message
     const lastMessage = messages[messages.length - 1];
     if (lastMessage && lastMessage.role === "assistant" && onOpenDraft) {
       const draftId = extractDraftId(lastMessage.content);
@@ -88,10 +89,8 @@ export function ChatInterface({
     }
   }, [messages, onOpenDraft, openedDraftIds]);
 
-  // Estado para controlar o diálogo de confirmação
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
-  // Palavras-chave que indicam modificação de conteúdo
   const isModificationRequest = (text: string): boolean => {
     const keywords = [
       "mude", "altere", "modifique", "edite", "troque", "substitua",
@@ -103,39 +102,83 @@ export function ChatInterface({
     return keywords.some((kw) => lower.includes(kw));
   };
 
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.name.endsWith(".docx")) {
+        toast.error("Apenas arquivos .docx são suportados");
+        return;
+      }
+      setSelectedFile(file);
+      toast.info(`Arquivo selecionado: ${file.name}`);
+    }
+  };
+
+  // Handle file upload
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    try {
+      const result = await uploadDocument(selectedFile);
+      
+      // Add system message about the upload
+      const uploadMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: `📎 Documento "${selectedFile.name}" importado com sucesso!\n\nO documento está pronto para edição. Você pode me pedir para fazer modificações.\n\nID do Rascunho: #${result.draftId}`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, uploadMessage]);
+      
+      // Open the draft
+      onOpenDraft?.(result.draftId);
+      
+      toast.success("Documento importado com sucesso!");
+      setSelectedFile(null);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao importar documento");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Cancel file selection
+  const handleCancelFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSendMessage = async (forceMessage?: string) => {
-    // Garantir que messageToSend é sempre uma string
     const messageToSend = typeof forceMessage === "string" ? forceMessage : inputValue;
     if (!messageToSend || !messageToSend.trim()) return;
 
-    // Se há um draft ativo e é uma solicitação de modificação, verificar se foi editado manualmente
     if (activeDraftId && isModificationRequest(messageToSend) && typeof forceMessage !== "string") {
       try {
         const status = await getDraftStatus(activeDraftId);
-        if (status.manuallyEdited) {
-          // Salvar mensagem para usar depois da confirmação
-          const savedMessage = messageToSend;
-          setPendingMessage(savedMessage);
+        
+        // Se o documento foi publicado, avisar o usuário para anexar
+        if (status.status === "published") {
           toast.warning(
-            "⚠️ Você editou o documento manualmente. Modificações da IA vão regenerar o documento e podem perder formatações personalizadas (cores, fontes, etc).",
-            {
-              duration: 10000,
-              action: {
-                label: "Continuar mesmo assim",
-                onClick: () => {
-                  setPendingMessage(null);
-                  handleSendMessage(savedMessage);
-                },
-              },
-              cancel: {
-                label: "Cancelar",
-                onClick: () => {
-                  setPendingMessage(null);
-                  setInputValue(messageToSend);
-                },
-              },
-            }
+            "📎 Este documento já foi exportado e não está mais disponível para edição. Anexe o documento novamente usando o botão de clipe para continuar editando.",
+            { duration: 8000 }
           );
+          
+          const warningMessage: Message = {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: "⚠️ O documento atual já foi exportado e o arquivo local foi removido.\n\nPara continuar editando, você precisa:\n1. Baixar o documento exportado\n2. Clicar no botão 📎 (clipe) ao lado do campo de mensagem\n3. Selecionar o arquivo .docx\n4. Clicar em \"Importar\"\n\nAssim poderei fazer as modificações que você precisa!",
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, { 
+            id: (Date.now() - 1).toString(), 
+            role: "user", 
+            content: messageToSend, 
+            timestamp: new Date() 
+          }, warningMessage]);
           setInputValue("");
           return;
         }
@@ -156,14 +199,10 @@ export function ChatInterface({
     setIsLoading(true);
 
     try {
-      // Obter conteúdo atual do editor (pode ter edições manuais do usuário)
       const currentEditorContent = getEditorContent?.() || null;
-      
-      // Enviar mensagem com o ID do draft ativo e conteúdo atual do editor
       const response = await sendMessage(userMessage.content, activeDraftId, currentEditorContent);
       setMessages((prev) => [...prev, response]);
       
-      // Se a IA atualizou o draft, notificar o componente pai para recarregar o editor
       if (response.draftUpdated && response.updatedDraftId && onDraftUpdated) {
         console.log("ChatInterface: Draft was updated by AI, notifying parent. Draft ID:", response.updatedDraftId);
         onDraftUpdated(response.updatedDraftId);
@@ -189,6 +228,15 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden relative">
+      {/* Hidden file input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept=".docx"
+        className="hidden"
+      />
+
       {/* Área de mensagens com scroll */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
@@ -243,10 +291,7 @@ export function ChatInterface({
                               size="sm"
                               className="text-xs"
                               onClick={() => {
-                                console.log(
-                                  "ChatInterface: Button clicked for draft ID:",
-                                  draftId
-                                );
+                                console.log("ChatInterface: Button clicked for draft ID:", draftId);
                                 onOpenDraft?.(draftId);
                               }}
                             >
@@ -281,6 +326,44 @@ export function ChatInterface({
         </ScrollArea>
       </div>
 
+      {/* Selected file indicator */}
+      {selectedFile && (
+        <div className="shrink-0 px-4 py-2 bg-blue-50 border-t border-blue-100">
+          <div className="max-w-3xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-blue-700">
+              <FileUp className="w-4 h-4" />
+              <span className="truncate max-w-[200px]">{selectedFile.name}</span>
+              <span className="text-blue-500 text-xs">
+                ({(selectedFile.size / 1024).toFixed(1)} KB)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCancelFile}
+                className="text-gray-500 hover:text-red-500 h-7 px-2"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleUpload}
+                disabled={isUploading}
+                className="bg-blue-600 hover:bg-blue-700 text-white h-7"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                ) : (
+                  <FileUp className="w-4 h-4 mr-1" />
+                )}
+                Importar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Input fixo no bottom */}
       <div className="shrink-0 p-3 md:p-4 pb-4 md:pb-8 bg-linear-to-t from-background via-background to-transparent">
         <div className="max-w-3xl mx-auto relative">
@@ -290,20 +373,23 @@ export function ChatInterface({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isLoading}
+              disabled={isLoading || isUploading}
               className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent text-gray-700 placeholder:text-gray-400 h-10 md:h-11 py-2 md:py-3 text-sm"
             />
             <div className="flex items-center gap-1 md:gap-2 ml-1 md:ml-2 mb-0.5 md:mb-1">
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || isUploading}
                 className="text-gray-400 hover:text-blue-600 rounded-full h-7 w-7 md:h-8 md:w-8"
+                title="Anexar documento .docx"
               >
                 <Paperclip className="w-4 h-4" />
               </Button>
               <Button
-                onClick={handleSendMessage}
-                disabled={isLoading || !inputValue.trim()}
+                onClick={() => handleSendMessage()}
+                disabled={isLoading || isUploading || !inputValue.trim()}
                 variant="ghost"
                 size="icon"
                 className="text-blue-600 hover:bg-blue-50 rounded-full h-7 w-7 md:h-8 md:w-8"
@@ -312,7 +398,7 @@ export function ChatInterface({
               </Button>
             </div>
           </div>
-          <div className="text-center mt-1 md:mt-2 text-[10px] md:text-xs text-gray-400">v 1.10.0</div>
+          <div className="text-center mt-1 md:mt-2 text-[10px] md:text-xs text-gray-400">v 1.11.0</div>
         </div>
       </div>
     </div>

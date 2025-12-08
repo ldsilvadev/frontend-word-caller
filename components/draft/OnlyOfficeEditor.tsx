@@ -84,6 +84,8 @@ export const OnlyOfficeEditor = forwardRef<OnlyOfficeEditorRef, OnlyOfficeEditor
     useImperativeHandle(ref, () => ({
       reloadDocument: async () => {
         toast.info("Recarregando documento...");
+        // Pequeno delay para garantir que o arquivo foi salvo no disco
+        await new Promise(resolve => setTimeout(resolve, 500));
         reload();
       },
     }), [reload]);
