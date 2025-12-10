@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Message } from "@/types";
-import { sendMessage, getDraftStatus, uploadDocument } from "@/lib/api";
+import {
+  sendMessage,
+  getDraftStatus,
+  uploadDocument,
+  createConversation,
+} from "@/lib/api";
 import { toast } from "sonner";
 
 interface EditorContent {
@@ -24,9 +29,12 @@ interface EditorContent {
 
 interface ChatInterfaceProps {
   onMessageSuccess?: () => void;
-  onOpenDraft?: (id: number) => void;
-  onDraftUpdated?: (draftId: number) => void;
-  activeDraftId?: number | null;
+  onOpenDraft?: (id: string) => void;
+  onDraftUpdated?: (draftId: string) => void;
+  onConversationCreated?: (conv: { id: string; title: string }) => void;
+  activeDraftId?: string | null;
+  conversationId?: string | null;
+  initialMessages?: Message[];
   getEditorContent?: () => EditorContent | null;
 }
 
@@ -34,10 +42,28 @@ export function ChatInterface({
   onMessageSuccess,
   onOpenDraft,
   onDraftUpdated,
+  onConversationCreated,
   activeDraftId,
+  conversationId,
+  initialMessages,
   getEditorContent,
 }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages || []);
+  const [currentConversationId, setCurrentConversationId] = useState<
+    string | null
+  >(conversationId || null);
+
+  // Atualizar mensagens quando initialMessages mudar
+  useEffect(() => {
+    if (initialMessages) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
+
+  // Atualizar conversationId quando prop mudar
+  useEffect(() => {
+    setCurrentConversationId(conversationId || null);
+  }, [conversationId]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -49,23 +75,25 @@ export function ChatInterface({
   const [openedDraftIds, setOpenedDraftIds] = useState<Set<string>>(new Set());
 
   // Helper function to extract draft ID from message content
-  const extractDraftId = (content: string): number | null => {
+  // Suporta MongoDB ObjectId (24 caracteres hexadecimais)
+  const extractDraftId = (content: string): string | null => {
     const patterns = [
-      /ID\s*:?\s*\**(\d+)\**/i,
-      /draft[_\s-]*id\s*:?\s*\**(\d+)\**/i,
-      /rascunho[_\s-]*id\s*:?\s*\**(\d+)\**/i,
-      /#(\d+)/,
-      /draft\s*#?\s*(\d+)/i,
-      /rascunho\s*#?\s*(\d+)/i,
-      /"id"\s*:\s*(\d+)/i,
-      /criado.*?(\d+)/i,
-      /created.*?(\d+)/i,
+      // MongoDB ObjectId (24 hex chars)
+      /ID\s*:?\s*\**([a-fA-F0-9]{24})\**/i,
+      /draft[_\s-]*id\s*:?\s*\**([a-fA-F0-9]{24})\**/i,
+      /rascunho[_\s-]*id\s*:?\s*\**([a-fA-F0-9]{24})\**/i,
+      /#([a-fA-F0-9]{24})/,
+      /draft\s*#?\s*([a-fA-F0-9]{24})/i,
+      /rascunho\s*#?\s*([a-fA-F0-9]{24})/i,
+      /"_?id"\s*:\s*"?([a-fA-F0-9]{24})"?/i,
+      /criado.*?([a-fA-F0-9]{24})/i,
+      /created.*?([a-fA-F0-9]{24})/i,
     ];
 
     for (const pattern of patterns) {
       const match = content.match(pattern);
       if (match && match[1]) {
-        return parseInt(match[1]);
+        return match[1];
       }
     }
     return null;
@@ -80,16 +108,14 @@ export function ChatInterface({
     if (lastMessage && lastMessage.role === "assistant" && onOpenDraft) {
       const draftId = extractDraftId(lastMessage.content);
       const messageKey = `${lastMessage.id}-${draftId}`;
-      
+
       if (draftId && !openedDraftIds.has(messageKey)) {
         console.log("ChatInterface: Auto-detecting draft ID:", draftId);
-        setOpenedDraftIds(prev => new Set(prev).add(messageKey));
+        setOpenedDraftIds((prev) => new Set(prev).add(messageKey));
         onOpenDraft(draftId);
       }
     }
   }, [messages, onOpenDraft, openedDraftIds]);
-
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   const isModificationRequest = (text: string): boolean => {
     const keywords = [
@@ -122,7 +148,7 @@ export function ChatInterface({
     setIsUploading(true);
     try {
       const result = await uploadDocument(selectedFile);
-      
+
       // Add system message about the upload
       const uploadMessage: Message = {
         id: Date.now().toString(),
@@ -130,11 +156,11 @@ export function ChatInterface({
         content: `📎 Documento "${selectedFile.name}" importado com sucesso!\n\nO documento está pronto para edição. Você pode me pedir para fazer modificações.\n\nID do Rascunho: #${result.draftId}`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, uploadMessage]);
-      
+      setMessages((prev) => [...prev, uploadMessage]);
+
       // Open the draft
       onOpenDraft?.(result.draftId);
-      
+
       toast.success("Documento importado com sucesso!");
       setSelectedFile(null);
     } catch (error: any) {
@@ -153,32 +179,42 @@ export function ChatInterface({
   };
 
   const handleSendMessage = async (forceMessage?: string) => {
-    const messageToSend = typeof forceMessage === "string" ? forceMessage : inputValue;
+    const messageToSend =
+      typeof forceMessage === "string" ? forceMessage : inputValue;
     if (!messageToSend || !messageToSend.trim()) return;
 
-    if (activeDraftId && isModificationRequest(messageToSend) && typeof forceMessage !== "string") {
+    if (
+      activeDraftId &&
+      isModificationRequest(messageToSend) &&
+      typeof forceMessage !== "string"
+    ) {
       try {
         const status = await getDraftStatus(activeDraftId);
-        
+
         // Se o documento foi publicado, avisar o usuário para anexar
         if (status.status === "published") {
           toast.warning(
             "📎 Este documento já foi exportado e não está mais disponível para edição. Anexe o documento novamente usando o botão de clipe para continuar editando.",
             { duration: 8000 }
           );
-          
+
           const warningMessage: Message = {
             id: Date.now().toString(),
             role: "assistant",
-            content: "⚠️ O documento atual já foi exportado e o arquivo local foi removido.\n\nPara continuar editando, você precisa:\n1. Baixar o documento exportado\n2. Clicar no botão 📎 (clipe) ao lado do campo de mensagem\n3. Selecionar o arquivo .docx\n4. Clicar em \"Importar\"\n\nAssim poderei fazer as modificações que você precisa!",
+            content:
+              "⚠️ O documento atual já foi exportado e o arquivo local foi removido.\n\nPara continuar editando, você precisa:\n1. Baixar o documento exportado\n2. Clicar no botão 📎 (clipe) ao lado do campo de mensagem\n3. Selecionar o arquivo .docx\n4. Clicar em \"Importar\"\n\nAssim poderei fazer as modificações que você precisa!",
             timestamp: new Date(),
           };
-          setMessages(prev => [...prev, { 
-            id: (Date.now() - 1).toString(), 
-            role: "user", 
-            content: messageToSend, 
-            timestamp: new Date() 
-          }, warningMessage]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() - 1).toString(),
+              role: "user",
+              content: messageToSend,
+              timestamp: new Date(),
+            },
+            warningMessage,
+          ]);
           setInputValue("");
           return;
         }
@@ -199,15 +235,32 @@ export function ChatInterface({
     setIsLoading(true);
 
     try {
+      // Se não tem conversa, criar uma nova
+      let convId = currentConversationId;
+      if (!convId) {
+        const newConv = await createConversation();
+        convId = newConv.id;
+        setCurrentConversationId(convId);
+        onConversationCreated?.(newConv);
+      }
+
       const currentEditorContent = getEditorContent?.() || null;
-      const response = await sendMessage(userMessage.content, activeDraftId, currentEditorContent);
+      const response = await sendMessage(
+        userMessage.content,
+        activeDraftId,
+        currentEditorContent,
+        convId
+      );
       setMessages((prev) => [...prev, response]);
-      
+
       if (response.draftUpdated && response.updatedDraftId && onDraftUpdated) {
-        console.log("ChatInterface: Draft was updated by AI, notifying parent. Draft ID:", response.updatedDraftId);
+        console.log(
+          "ChatInterface: Draft was updated by AI, notifying parent. Draft ID:",
+          response.updatedDraftId
+        );
         onDraftUpdated(response.updatedDraftId);
       }
-      
+
       if (onMessageSuccess) {
         onMessageSuccess();
       }
@@ -281,27 +334,31 @@ export function ChatInterface({
                     <div className="whitespace-pre-wrap wrap-anywhere">
                       {message.content}
                     </div>
-                    {message.role === "assistant" && (() => {
-                      const draftId = extractDraftId(message.content);
-                      if (draftId) {
-                        return (
-                          <div className="mt-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="text-xs"
-                              onClick={() => {
-                                console.log("ChatInterface: Button clicked for draft ID:", draftId);
-                                onOpenDraft?.(draftId);
-                              }}
-                            >
-                              Abrir Rascunho #{draftId}
-                            </Button>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                    {message.role === "assistant" &&
+                      (() => {
+                        const draftId = extractDraftId(message.content);
+                        if (draftId) {
+                          return (
+                            <div className="mt-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => {
+                                  console.log(
+                                    "ChatInterface: Button clicked for draft ID:",
+                                    draftId
+                                  );
+                                  onOpenDraft?.(draftId);
+                                }}
+                              >
+                                Abrir Rascunho
+                              </Button>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                   </div>
                 </div>
               ))
@@ -398,7 +455,9 @@ export function ChatInterface({
               </Button>
             </div>
           </div>
-          <div className="text-center mt-1 md:mt-2 text-[10px] md:text-xs text-gray-400">v 1.11.0</div>
+          <div className="text-center mt-1 md:mt-2 text-[10px] md:text-xs text-gray-400">
+            v 1.12.0
+          </div>
         </div>
       </div>
     </div>

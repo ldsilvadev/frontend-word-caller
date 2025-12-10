@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Upload, RefreshCw, FileText, Clock, Download, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
 export interface DocumentEditorRef {
   reloadDocument: () => Promise<void>;
 }
 
 interface DocumentEditorProps {
-  draftId: number;
+  draftId: string; // MongoDB ObjectId
   onPublishSuccess?: () => void;
 }
 

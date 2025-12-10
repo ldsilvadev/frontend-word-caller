@@ -5,14 +5,14 @@ import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
 export interface OnlyOfficeEditorRef {
   reloadDocument: () => Promise<void>;
 }
 
 interface OnlyOfficeEditorProps {
-  draftId: number;
+  draftId: string; // MongoDB ObjectId
   onSave?: () => void;
   onError?: (error: string) => void;
 }

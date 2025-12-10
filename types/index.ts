@@ -6,7 +6,7 @@ export interface Message {
 }
 
 export interface Document {
-  id: number;
+  id: string;
   filename: string;
   publicUrl?: string | null;
   createdAt?: string;
@@ -38,8 +38,39 @@ export interface DraftContent {
 }
 
 export interface Draft {
-  id: number;
+  id: string; // MongoDB ObjectId (24 caracteres hexadecimais)
+  _id?: string; // Alias para compatibilidade
   title: string;
   content: DraftContent;
   status: "draft" | "published";
+}
+
+/**
+ * Conversation - Histórico de conversas com a IA
+ */
+export interface ConversationDocument {
+  draftId?: string;
+  title?: string;
+  hasDocument: boolean;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  document?: ConversationDocument;
+  messagesCount: number;
+  lastMessage?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: ConversationMessage[];
 }
