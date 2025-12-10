@@ -1,14 +1,33 @@
-import { Message } from "@/types";
+import {
+  Message,
+  Document,
+  Draft,
+  ConversationSummary,
+  ConversationDetail,
+} from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
-export async function sendMessage(content: string): Promise<Message> {
+export interface SendMessageResponse extends Message {
+  draftUpdated?: boolean;
+  updatedDraftId?: string | null; // MongoDB ObjectId
+}
+
+export async function sendMessage(
+  content: string,
+  activeDraftId?: string | null,
+  editorContent?: any,
+  conversationId?: string | null
+): Promise<SendMessageResponse> {
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ message: content }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: content,
+      activeDraftId: activeDraftId || null,
+      conversationId: conversationId || null,
+      editorContent: editorContent || null,
+    }),
   });
 
   if (!response.ok) {
@@ -22,49 +41,157 @@ export async function sendMessage(content: string): Promise<Message> {
     role: "assistant",
     content: data.response,
     timestamp: new Date(),
+    draftUpdated: data.draftUpdated || false,
+    updatedDraftId: data.updatedDraftId || null,
   };
 }
 
-export async function getLatestDocument(): Promise<ArrayBuffer | null> {
-  // 1. Get list of documents
+export async function getDocuments(): Promise<Document[]> {
   const listRes = await fetch(`${API_URL}/documents`);
   if (!listRes.ok) throw new Error("Failed to fetch documents list");
 
   const docs = await listRes.json();
+  return docs;
+}
+
+export async function getLatestDocument(): Promise<ArrayBuffer | null> {
+  const docs = await getDocuments();
   if (!docs || docs.length === 0) return null;
 
-  // 2. Get the latest one (assuming ID increments or we sort by date)
-  // The API returns { id, filename, createdAt, ... }
-  // Let's sort by ID desc
-  const latestDoc = docs.sort((a: any, b: any) => b.id - a.id)[0];
-
-  // 3. Fetch content
+  const latestDoc = docs[0];
   const contentRes = await fetch(`${API_URL}/documents/${latestDoc.id}`);
   if (!contentRes.ok) throw new Error("Failed to fetch document content");
 
   return await contentRes.arrayBuffer();
 }
 
-export async function getLatestPdf(): Promise<Blob | null> {
-  // 1. Get list of documents
-  const listRes = await fetch(`${API_URL}/documents`);
-  if (!listRes.ok) throw new Error("Failed to fetch documents list");
+export async function getDraft(id: string): Promise<Draft> {
+  const response = await fetch(`${API_URL}/drafts/${id}`);
+  if (!response.ok) throw new Error("Failed to fetch draft");
+  return await response.json();
+}
 
-  const docs = await listRes.json();
-  if (!docs || docs.length === 0) return null;
+export interface DraftStatus {
+  id: string; // MongoDB ObjectId
+  title: string;
+  status: string;
+  filePath: string | null;
+  fileExists?: boolean;
+  fileModifiedAt?: string | null;
+  lastModified: string | null;
+  downloadUrl?: string | null;
+  publishedAt?: string | null;
+  metadata: {
+    assunto: string;
+    codigo: string;
+    departamento: string;
+    revisao: string;
+    data_publicacao: string;
+    data_vigencia: string;
+  } | null;
+}
 
-  // 2. Get the latest one
-  const latestDoc = docs.sort((a: any, b: any) => b.id - a.id)[0];
+export async function getDraftStatus(id: string): Promise<DraftStatus> {
+  const response = await fetch(`${API_URL}/drafts/${id}/status`);
+  if (!response.ok) throw new Error("Failed to fetch draft status");
+  return await response.json();
+}
 
-  // 3. Fetch PDF content
-  const contentRes = await fetch(`${API_URL}/documents/${latestDoc.id}/pdf`);
+export async function publishDraft(
+  id: string
+): Promise<{ result: string; filename: string; downloadUrl: string | null }> {
+  const response = await fetch(`${API_URL}/drafts/${id}/publish`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to publish draft");
+  return await response.json();
+}
 
-  if (contentRes.status === 404) {
-    // PDF might not be ready yet or failed
-    return null;
+export interface UploadDocumentResponse {
+  success: boolean;
+  draftId: string; // MongoDB ObjectId
+  filename: string;
+  message: string;
+}
+
+export async function uploadDocument(
+  file: File
+): Promise<UploadDocumentResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_URL}/drafts/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to upload document");
   }
 
-  if (!contentRes.ok) throw new Error("Failed to fetch document PDF");
+  return await response.json();
+}
 
-  return await contentRes.blob();
+
+// ==================== CONVERSATIONS API ====================
+
+export async function getConversations(
+  search?: string
+): Promise<ConversationSummary[]> {
+  const url = search
+    ? `${API_URL}/conversations?search=${encodeURIComponent(search)}`
+    : `${API_URL}/conversations`;
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Failed to fetch conversations");
+  return response.json();
+}
+
+export async function getConversation(id: string): Promise<ConversationDetail> {
+  const response = await fetch(`${API_URL}/conversations/${id}`);
+  if (!response.ok) throw new Error("Failed to fetch conversation");
+  return response.json();
+}
+
+export async function createConversation(
+  title?: string,
+  draftId?: string
+): Promise<ConversationSummary> {
+  const response = await fetch(`${API_URL}/conversations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, draftId }),
+  });
+  if (!response.ok) throw new Error("Failed to create conversation");
+  return response.json();
+}
+
+export async function updateConversationTitle(
+  id: string,
+  title: string
+): Promise<void> {
+  const response = await fetch(`${API_URL}/conversations/${id}/title`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error("Failed to update conversation title");
+}
+
+export async function openConversationDocument(
+  id: string
+): Promise<{ draftId: string; isNew: boolean }> {
+  const response = await fetch(`${API_URL}/conversations/${id}/open-document`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to open document");
+  return response.json();
+}
+
+export async function archiveConversation(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/conversations/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Failed to archive conversation");
 }

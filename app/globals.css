@@ -45,37 +45,38 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #e6f0f9;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
+  --popover: #ffffff;
+  --popover-foreground: #1e293b;
+  --primary: #0060b6;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #0060b6;
+  --chart-1: #0060b6;
+  --chart-2: #2563eb;
+  --chart-3: #3b82f6;
+  --chart-4: #60a5fa;
+  --chart-5: #93c5fd;
+  --sidebar: #0060b6;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #004e93;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #004e93;
+  --sidebar-ring: #60a5fa;
 }
 
 .dark {
@@ -118,5 +119,669 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Word-like Editor Styles */
+.word-page {
+  padding: 72px 72px;
+  box-sizing: border-box;
+}
+
+.word-editor {
+  outline: none;
+  min-height: 100%;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12pt;
+  line-height: 1.5;
+  color: #000;
+  /* CSS Counters for automatic heading numbering */
+  counter-reset: h1counter;
+}
+
+.word-editor:focus {
+  outline: none;
+}
+
+/* Headings with automatic numbering */
+.word-editor h1 {
+  font-size: 24pt;
+  font-weight: bold;
+  margin-bottom: 12pt;
+  margin-top: 24pt;
+  line-height: 1.2;
+  color: #000;
+  counter-increment: h1counter;
+  counter-reset: h2counter;
+}
+
+.word-editor h1::before {
+  content: counter(h1counter) ". ";
+  color: #0060b6;
+}
+
+.word-editor h1:first-child {
+  margin-top: 0;
+}
+
+.word-editor h2 {
+  font-size: 18pt;
+  font-weight: bold;
+  margin-bottom: 10pt;
+  margin-top: 18pt;
+  line-height: 1.3;
+  color: #000;
+  counter-increment: h2counter;
+  counter-reset: h3counter;
+}
+
+.word-editor h2::before {
+  content: counter(h1counter) "." counter(h2counter) " ";
+  color: #0060b6;
+}
+
+.word-editor h3 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-bottom: 8pt;
+  margin-top: 14pt;
+  line-height: 1.4;
+  color: #000;
+  counter-increment: h3counter;
+}
+
+.word-editor h3::before {
+  content: counter(h1counter) "." counter(h2counter) "." counter(h3counter) " ";
+  color: #0060b6;
+}
+
+/* Paragraphs */
+.word-editor p {
+  margin-bottom: 12pt;
+  text-align: justify;
+}
+
+.word-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #adb5bd;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Lists */
+.word-editor ul,
+.word-editor ol {
+  padding-left: 24pt;
+  margin-bottom: 12pt;
+}
+
+.word-editor ul {
+  list-style-type: disc;
+}
+
+.word-editor ol {
+  list-style-type: decimal;
+}
+
+.word-editor li {
+  margin-bottom: 4pt;
+}
+
+.word-editor li p {
+  margin-bottom: 0;
+}
+
+/* Nested lists */
+.word-editor ul ul {
+  list-style-type: circle;
+  margin-bottom: 0;
+}
+
+.word-editor ul ul ul {
+  list-style-type: square;
+}
+
+/* Blockquote */
+.word-editor blockquote {
+  border-left: 3px solid #0060b6;
+  padding-left: 16pt;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 12pt;
+  font-style: italic;
+  color: #444;
+}
+
+/* Horizontal rule */
+.word-editor hr {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: 24pt 0;
+}
+
+/* Text formatting */
+.word-editor strong {
+  font-weight: bold;
+}
+
+.word-editor em {
+  font-style: italic;
+}
+
+.word-editor u {
+  text-decoration: underline;
+}
+
+.word-editor s {
+  text-decoration: line-through;
+}
+
+.word-editor mark {
+  background-color: #ffff00;
+  padding: 0 2px;
+}
+
+/* Code blocks */
+.word-editor pre {
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12pt;
+  margin-bottom: 12pt;
+  overflow-x: auto;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 10pt;
+}
+
+.word-editor code {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 10pt;
+  background-color: #f5f5f5;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.word-editor pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Tables */
+.word-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 12pt;
+}
+
+.word-editor th,
+.word-editor td {
+  border: 1px solid #000;
+  padding: 6pt 8pt;
+  text-align: left;
+}
+
+.word-editor th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+.word-editor tr:nth-child(even) td {
+  background-color: #fafafa;
+}
+
+/* Text alignment */
+.word-editor [style*="text-align: center"] {
+  text-align: center;
+}
+
+.word-editor [style*="text-align: right"] {
+  text-align: right;
+}
+
+.word-editor [style*="text-align: justify"] {
+  text-align: justify;
+}
+
+/* Selection */
+.word-editor ::selection {
+  background-color: #b4d7ff;
+}
+
+/* Placeholder */
+.word-editor .is-empty::before {
+  content: attr(data-placeholder);
+  color: #adb5bd;
+  pointer-events: none;
+  position: absolute;
+}
+
+/* ========================================
+   FIERGS Document Template Styles
+   ======================================== */
+
+.word-document {
+  font-family: "Arial", "Helvetica", sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #000;
+  /* Remove fixed height - let content flow naturally */
+}
+
+/* Document Header */
+.doc-header {
+  background: #fff;
+}
+
+/* Document Content Area - grows with content */
+
+.doc-content .word-editor {
+  font-family: "Arial", "Helvetica", sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  counter-reset: h1counter;
+  min-height: 200px;
+}
+
+.doc-content .word-editor > *:first-child {
+  margin-top: 0 !important;
+}
+
+.doc-content .word-editor h1 {
+  font-size: 13pt;
+  font-weight: bold;
+  margin-bottom: 10pt;
+  margin-top: 20pt;
+  text-transform: uppercase;
+  page-break-after: avoid;
+}
+
+.doc-content .word-editor h1:first-child {
+  margin-top: 0;
+}
+
+.doc-content .word-editor h2 {
+  font-size: 12pt;
+  font-weight: bold;
+  margin-bottom: 8pt;
+  margin-top: 16pt;
+  page-break-after: avoid;
+}
+
+.doc-content .word-editor h3 {
+  font-size: 11pt;
+  font-weight: bold;
+  margin-bottom: 6pt;
+  margin-top: 12pt;
+  page-break-after: avoid;
+}
+
+.doc-content .word-editor p {
+  margin-bottom: 10pt;
+  text-align: justify;
+  text-indent: 1.25cm; /* Indentação padrão Word de primeira linha */
+  line-height: 1.6;
+}
+
+/* Primeiro parágrafo após título não tem indentação */
+.doc-content .word-editor h1 + p,
+.doc-content .word-editor h2 + p,
+.doc-content .word-editor h3 + p {
+  text-indent: 0;
+}
+
+/* Lists in document */
+.doc-content .word-editor ul,
+.doc-content .word-editor ol {
+  padding-left: 24pt;
+  margin-bottom: 10pt;
+  margin-top: 6pt;
+}
+
+.doc-content .word-editor li {
+  margin-bottom: 6pt;
+  line-height: 1.5;
+}
+
+.doc-content .word-editor li p {
+  text-indent: 0;
+  margin-bottom: 0;
+}
+
+/* Nested lists */
+.doc-content .word-editor ul ul,
+.doc-content .word-editor ol ol,
+.doc-content .word-editor ul ol,
+.doc-content .word-editor ol ul {
+  margin-top: 4pt;
+  margin-bottom: 4pt;
+}
+
+/* Blockquotes */
+.doc-content .word-editor blockquote {
+  border-left: 3px solid #0060b6;
+  padding-left: 12pt;
+  margin: 12pt 0;
+  font-style: italic;
+  color: #333;
+}
+
+/* Tables in document */
+.doc-content .word-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12pt 0;
+  font-size: 10pt;
+}
+
+.doc-content .word-editor th,
+.doc-content .word-editor td {
+  border: 1px solid #333;
+  padding: 6pt 8pt;
+  text-align: left;
+}
+
+.doc-content .word-editor th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+/* Code blocks */
+.doc-content .word-editor pre {
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  padding: 10pt;
+  margin: 10pt 0;
+  font-size: 9pt;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Document Footer */
+.doc-footer {
+  background: #fff;
+}
+
+/* ========================================
+   A4 Document Styles (Continuous)
+   ======================================== */
+
+.a4-document {
+  font-family: "Arial", "Helvetica", sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.a4-document .page-header {
+  background: #fff;
+}
+
+.a4-document .page-footer {
+  background: #fff;
+}
+
+.a4-document .doc-content {
+  position: relative;
+}
+
+.a4-document .doc-content .word-editor {
+  font-family: "Arial", "Helvetica", sans-serif;
+  font-size: 10pt;
+  line-height: 1.6;
+  counter-reset: h1counter;
+  min-height: 400px;
+}
+
+.a4-document .doc-content .word-editor > *:first-child {
+  margin-top: 0 !important;
+}
+
+.a4-document .doc-content .word-editor h1 {
+  font-size: 12pt;
+  font-weight: bold;
+  margin-bottom: 8pt;
+  margin-top: 16pt;
+  text-transform: uppercase;
+}
+
+.a4-document .doc-content .word-editor h1:first-child {
+  margin-top: 0;
+}
+
+.a4-document .doc-content .word-editor h2 {
+  font-size: 11pt;
+  font-weight: bold;
+  margin-bottom: 6pt;
+  margin-top: 14pt;
+}
+
+.a4-document .doc-content .word-editor h3 {
+  font-size: 10pt;
+  font-weight: bold;
+  margin-bottom: 4pt;
+  margin-top: 12pt;
+}
+
+.a4-document .doc-content .word-editor p {
+  margin-bottom: 10pt;
+  text-align: justify;
+  text-indent: 1.25cm; /* Indentação padrão Word de primeira linha */
+  line-height: 1.6;
+}
+
+/* Primeiro parágrafo após título não tem indentação */
+.a4-document .doc-content .word-editor h1 + p,
+.a4-document .doc-content .word-editor h2 + p,
+.a4-document .doc-content .word-editor h3 + p {
+  text-indent: 0;
+}
+
+/* Listas estilo Word */
+.a4-document .doc-content .word-editor ul,
+.a4-document .doc-content .word-editor ol {
+  padding-left: 36pt;
+  margin-bottom: 10pt;
+  margin-top: 6pt;
+  margin-left: 0;
+}
+
+.a4-document .doc-content .word-editor ul {
+  list-style-type: disc;
+}
+
+.a4-document .doc-content .word-editor ul ul {
+  list-style-type: circle;
+  margin-top: 4pt;
+  margin-bottom: 4pt;
+}
+
+.a4-document .doc-content .word-editor ul ul ul {
+  list-style-type: square;
+}
+
+.a4-document .doc-content .word-editor ol {
+  list-style-type: decimal;
+}
+
+.a4-document .doc-content .word-editor ol ol {
+  list-style-type: lower-alpha;
+  margin-top: 4pt;
+  margin-bottom: 4pt;
+}
+
+.a4-document .doc-content .word-editor ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.a4-document .doc-content .word-editor li {
+  margin-bottom: 6pt;
+  line-height: 1.5;
+  padding-left: 4pt;
+}
+
+.a4-document .doc-content .word-editor li p {
+  margin-bottom: 0;
+  text-indent: 0;
+}
+
+.a4-document .doc-content .word-editor li::marker {
+  color: #333;
+}
+
+.a4-document .doc-content .word-editor blockquote {
+  border-left: 3px solid #0060b6;
+  padding-left: 12pt;
+  margin: 12pt 0;
+  font-style: italic;
+  color: #333;
+}
+
+.a4-document .doc-content .word-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12pt 0;
+  font-size: 9pt;
+}
+
+.a4-document .doc-content .word-editor th,
+.a4-document .doc-content .word-editor td {
+  border: 1px solid #333;
+  padding: 5pt 7pt;
+  text-align: left;
+}
+
+.a4-document .doc-content .word-editor th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+.a4-document .doc-content .word-editor pre {
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  padding: 8pt;
+  margin: 10pt 0;
+  font-size: 8pt;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Page break indicator line */
+.page-break-line {
+  position: relative;
+  height: 1px;
+  background: #cbd5e1;
+  margin: 0 -32px;
+}
+
+.page-break-line::after {
+  content: "quebra de página";
+  position: absolute;
+  right: 0;
+  top: -10px;
+  font-size: 9px;
+  color: #94a3b8;
+  background: #fff;
+  padding: 0 8px;
+}
+
+/* Estilos adicionais para parecer mais com Word */
+.a4-document .doc-content .word-editor strong,
+.a4-document .doc-content .word-editor b {
+  font-weight: 700;
+}
+
+.a4-document .doc-content .word-editor em,
+.a4-document .doc-content .word-editor i {
+  font-style: italic;
+}
+
+.a4-document .doc-content .word-editor u {
+  text-decoration: underline;
+}
+
+/* Espaçamento entre seções */
+.a4-document .doc-content .word-editor h1 + p,
+.a4-document .doc-content .word-editor h2 + p,
+.a4-document .doc-content .word-editor h3 + p {
+  margin-top: 0;
+}
+
+/* Citações estilo Word */
+.a4-document .doc-content .word-editor blockquote {
+  margin: 12pt 0 12pt 24pt;
+  padding: 0;
+  border-left: none;
+  font-style: normal;
+  color: #000;
+}
+
+/* Código inline */
+.a4-document .doc-content .word-editor code {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 9pt;
+  background-color: #f5f5f5;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+/* Linha horizontal */
+.a4-document .doc-content .word-editor hr {
+  border: none;
+  border-top: 1px solid #000;
+  margin: 16pt 0;
+}
+
+/* Seleção de texto */
+.a4-document .doc-content .word-editor ::selection {
+  background-color: #b4d7ff;
+}
+
+/* Cursor de texto */
+.a4-document .doc-content .word-editor .ProseMirror-focused {
+  outline: none;
+}
+
+/* Placeholder quando vazio */
+.a4-document .doc-content .word-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #adb5bd;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Print styles */
+@media print {
+  .a4-document {
+    box-shadow: none;
+    width: 100% !important;
+  }
+  
+  .a4-document .page-header {
+    position: running(header);
+  }
+  
+  .a4-document .page-footer {
+    position: running(footer);
+  }
+}
+
+/* Responsividade para telas menores */
+@media (max-width: 900px) {
+  .a4-document {
+    transform: scale(0.8);
+    transform-origin: top center;
+  }
+}
+
+@media (max-width: 600px) {
+  .a4-document {
+    transform: scale(0.6);
+    transform-origin: top center;
   }
 }
