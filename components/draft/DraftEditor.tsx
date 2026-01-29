@@ -58,7 +58,7 @@ interface DocumentMeta {
 }
 
 interface DraftEditorProps {
-  draftId: number;
+  draftId: string;
   onGenerateSuccess?: () => void;
 }
 
@@ -120,13 +120,17 @@ function extractMetadata(content: DraftContent | string, title: string): Documen
     data_vigencia: "---",
   };
   if (typeof content === "string") return defaultMeta;
+
+  // Se content tem metadata, usar ele; senão usar os campos diretos (backward compatibility)
+  const meta = content.metadata || (content as any);
+
   return {
-    assunto: content.assunto || title,
-    codigo: content.codigo || defaultMeta.codigo,
-    departamento: content.departamento || defaultMeta.departamento,
-    revisao: content.revisao || defaultMeta.revisao,
-    data_publicacao: content.data_publicacao || defaultMeta.data_publicacao,
-    data_vigencia: content.data_vigencia || defaultMeta.data_vigencia,
+    assunto: meta.assunto || title,
+    codigo: meta.codigo || defaultMeta.codigo,
+    departamento: meta.departamento || defaultMeta.departamento,
+    revisao: meta.revisao || defaultMeta.revisao,
+    data_publicacao: meta.data_publicacao || defaultMeta.data_publicacao,
+    data_vigencia: meta.data_vigencia || defaultMeta.data_vigencia,
   };
 }
 

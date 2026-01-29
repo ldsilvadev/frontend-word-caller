@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
-import { OnlyOfficeEditor, OnlyOfficeEditorRef } from "./OnlyOfficeEditor";
-import { getDraftStatus, publishDraft, DraftStatus } from "@/lib/api";
+import { OfficeOnlineViewer, OfficeOnlineViewerRef } from "./OfficeOnlineViewer";
+import { getDraftStatus, publishDraft, DraftStatus, getOneDriveDownloadUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Loader2, Upload, RefreshCw, FileText, Clock, Download, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -25,8 +25,8 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
     const [publishing, setPublishing] = useState(false);
     const [isReloading, setIsReloading] = useState(false);
     const [publishedInfo, setPublishedInfo] = useState<{ filename: string; downloadUrl?: string } | null>(null);
-    
-    const onlyOfficeRef = useRef<OnlyOfficeEditorRef>(null);
+
+    const viewerRef = useRef<OfficeOnlineViewerRef>(null);
 
     // Carregar status do draft
     const loadStatus = async () => {
@@ -61,15 +61,15 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
           console.log("[DocumentEditor] Documento já publicado, ignorando reload");
           return;
         }
-        
+
         setIsReloading(true);
-        toast.info("Recarregando documento...");
-        
-        await onlyOfficeRef.current?.reloadDocument();
+        toast.info("Recarregando preview...");
+
+        await viewerRef.current?.reloadPreview();
         await loadStatus();
-        
+
         setIsReloading(false);
-        toast.success("Documento recarregado!");
+        toast.success("Preview recarregado!");
       },
     }), [status?.status, publishedInfo]);
 
@@ -80,7 +80,7 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
         const result = await publishDraft(draftId);
         setPublishedInfo({
           filename: result.filename,
-          downloadUrl: result?.downloadUrl,
+          downloadUrl: result?.downloadUrl || undefined,
         });
         toast.success("Documento exportado com sucesso!", {
           description: `Arquivo: ${result.filename}`,
@@ -97,21 +97,15 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
 
     // Download do documento publicado
     const handleDownload = () => {
-      // Prioridade: downloadUrl do status > downloadUrl do publishedInfo > endpoint de download
-      if (status?.downloadUrl) {
-        window.open(status.downloadUrl, "_blank");
-      } else if (publishedInfo?.downloadUrl) {
-        window.open(publishedInfo.downloadUrl, "_blank");
-      } else {
-        const downloadUrl = `${API_URL}/drafts/${draftId}/download`;
-        window.open(downloadUrl, "_blank");
-      }
+      // Usar endpoint do OneDrive
+      const downloadUrl = getOneDriveDownloadUrl(draftId);
+      window.open(downloadUrl, "_blank");
     };
 
     // Recarregar documento
     const handleReload = async () => {
       setIsReloading(true);
-      await onlyOfficeRef.current?.reloadDocument();
+      await viewerRef.current?.reloadPreview();
       await loadStatus();
       setIsReloading(false);
     };
@@ -195,7 +189,7 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
       );
     }
 
-    // Documento ainda não publicado - mostrar editor OnlyOffice
+    // Documento ainda não publicado - mostrar preview Office Online
     return (
       <div className="flex flex-col h-full">
         {/* Header */}
@@ -257,17 +251,16 @@ export const DocumentEditor = forwardRef<DocumentEditorRef, DocumentEditorProps>
           </div>
         )}
 
-        {/* OnlyOffice Editor */}
+        {/* Office Online Viewer */}
         <div className="flex-1 overflow-hidden">
-          <OnlyOfficeEditor
-            ref={onlyOfficeRef}
+          <OfficeOnlineViewer
+            ref={viewerRef}
             draftId={draftId}
-            onSave={() => {
-              toast.success("Documento salvo!");
-              loadStatus();
+            onLoad={() => {
+              console.log("[DocumentEditor] Preview carregado");
             }}
             onError={(error) => {
-              toast.error(`Erro: ${error}`);
+              toast.error(`Erro no preview: ${error}`);
             }}
           />
         </div>

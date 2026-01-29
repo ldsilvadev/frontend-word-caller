@@ -97,6 +97,29 @@ export async function getDraftStatus(id: string): Promise<DraftStatus> {
   return await response.json();
 }
 
+export async function updateDraft(
+  id: string,
+  content: any
+): Promise<Draft> {
+  const response = await fetch(`${API_URL}/drafts/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!response.ok) throw new Error("Failed to update draft");
+  return await response.json();
+}
+
+export async function generateDocument(
+  id: string
+): Promise<{ success: boolean; filename: string; filePath: string }> {
+  const response = await fetch(`${API_URL}/drafts/${id}/generate`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to generate document");
+  return await response.json();
+}
+
 export async function publishDraft(
   id: string
 ): Promise<{ result: string; filename: string; downloadUrl: string | null }> {
@@ -194,4 +217,28 @@ export async function archiveConversation(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!response.ok) throw new Error("Failed to archive conversation");
+}
+
+// ==================== ONEDRIVE PREVIEW API ====================
+
+export interface PreviewData {
+  previewUrl: string;
+  fileName: string;
+  title: string;
+  lastModified: string;
+  downloadUrl: string;
+  webUrl?: string;
+}
+
+export async function getOneDrivePreview(id: string): Promise<PreviewData> {
+  const response = await fetch(`${API_URL}/onedrive/preview/${id}`);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to fetch preview" }));
+    throw new Error(error.message || "Failed to fetch OneDrive preview");
+  }
+  return await response.json();
+}
+
+export function getOneDriveDownloadUrl(id: string): string {
+  return `${API_URL}/onedrive/download/${id}`;
 }
