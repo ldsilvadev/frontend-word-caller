@@ -54,9 +54,33 @@ export interface ConversationDocument {
   hasDocument: boolean;
 }
 
+/**
+ * Metadados da política (pré-preenchidos antes do chat)
+ */
+export interface ConversationMetadata {
+  entidade: string; // FIERGS | SESI | SENAI | IEL | CIERGS
+  area: string; // RH, TI, FIN, etc.
+  tipologia: string; // POL, PROC, INST, etc.
+  codigo: string; // FIERGS-RH-POL (gerado automaticamente)
+  revisao: string; // "01"
+  dataValidade: string; // DD/MM/AAAA
+}
+
 export interface ConversationSummary {
   id: string;
   title: string;
+
+  // Campos individuais de metadata
+  entidade?: string;
+  area?: string;
+  tipologia?: string;
+  codigo?: string;
+  revisao?: string;
+  dataValidade?: string;
+
+  // Objeto metadata
+  metadata?: ConversationMetadata;
+
   document?: ConversationDocument;
   messagesCount: number;
   lastMessage?: string;

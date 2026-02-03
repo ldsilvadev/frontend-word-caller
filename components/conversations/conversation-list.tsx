@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { PolicyMetadataForm } from "./policy-metadata-form";
 
 interface ConversationListProps {
   activeConversationId?: string | null;
@@ -38,6 +39,7 @@ export function ConversationList({
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [showMetadataForm, setShowMetadataForm] = useState(false);
 
   const loadConversations = async (search?: string) => {
     try {
@@ -61,15 +63,39 @@ export function ConversationList({
     return () => clearTimeout(debounce);
   }, [searchQuery]);
 
-  const handleNewConversation = async () => {
+  const handleNewConversation = () => {
+    // Abrir formulário de metadata
+    setShowMetadataForm(true);
+  };
+
+  const handleMetadataSubmit = async (metadata: {
+    entidade: string;
+    area: string;
+    tipologia: string;
+  }) => {
     try {
-      const conv = await createConversation();
+      const conv = await createConversation({
+        title: `Política ${metadata.area}`,
+        metadata,
+      });
       setConversations((prev) => [conv, ...prev]);
       onNewConversation(); // Limpa mensagens e draft
       onSelectConversation(conv); // Seleciona a nova conversa
+      setShowMetadataForm(false);
+
+      // Exibir código gerado
+      if (conv.codigo) {
+        toast.success(`Política criada: ${conv.codigo}`, {
+          description: `Entidade: ${conv.entidade} | Área: ${conv.area} | Tipologia: ${conv.tipologia}`,
+        });
+      }
     } catch (error) {
       toast.error("Erro ao criar conversa");
     }
+  };
+
+  const handleMetadataCancel = () => {
+    setShowMetadataForm(false);
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -100,7 +126,16 @@ export function ConversationList({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <>
+      {/* Formulário de Metadata */}
+      {showMetadataForm && (
+        <PolicyMetadataForm
+          onSubmit={handleMetadataSubmit}
+          onCancel={handleMetadataCancel}
+        />
+      )}
+
+      <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
       <div className="p-3 border-b bg-white">
         <Button
@@ -177,6 +212,12 @@ export function ConversationList({
                       </Button>
                     </div>
 
+                    {conv.codigo && (
+                      <p className="text-xs text-blue-600 font-mono truncate mt-0.5 max-w-[160px]">
+                        📋 {conv.codigo}
+                      </p>
+                    )}
+
                     {conv.document?.title && (
                       <p className="text-xs text-green-600 truncate mt-0.5 max-w-[160px]">
                         📄 {conv.document.title}
@@ -205,5 +246,6 @@ export function ConversationList({
         </div>
       </ScrollArea>
     </div>
+    </>
   );
 }

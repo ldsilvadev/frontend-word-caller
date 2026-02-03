@@ -152,6 +152,7 @@ export default function Home() {
               conversationId={activeConversation?.id}
               initialMessages={conversationMessages}
               onConversationCreated={handleConversationCreated}
+              activeConversation={activeConversation}
             />
           </div>
 

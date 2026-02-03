@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Message } from "@/types";
+import { Message, ConversationSummary } from "@/types";
 import {
   sendMessage,
   getDraftStatus,
@@ -36,6 +36,7 @@ interface ChatInterfaceProps {
   conversationId?: string | null;
   initialMessages?: Message[];
   getEditorContent?: () => EditorContent | null;
+  activeConversation?: ConversationSummary | null;
 }
 
 export function ChatInterface({
@@ -47,6 +48,7 @@ export function ChatInterface({
   conversationId,
   initialMessages,
   getEditorContent,
+  activeConversation,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages || []);
   const [currentConversationId, setCurrentConversationId] = useState<
@@ -281,6 +283,21 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden relative">
+      {/* Badge de Metadata */}
+      {activeConversation?.metadata && (
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-100">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-blue-600">📋 Política:</span>
+            <span className="font-mono text-sm font-semibold text-blue-700">
+              {activeConversation.metadata.codigo}
+            </span>
+            <span className="text-xs text-blue-500">
+              ({activeConversation.metadata.entidade} • {activeConversation.metadata.area} • {activeConversation.metadata.tipologia})
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Hidden file input */}
       <input
         type="file"

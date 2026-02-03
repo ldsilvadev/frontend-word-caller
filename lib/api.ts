@@ -4,6 +4,7 @@ import {
   Draft,
   ConversationSummary,
   ConversationDetail,
+  ConversationMetadata,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
@@ -177,14 +178,23 @@ export async function getConversation(id: string): Promise<ConversationDetail> {
   return response.json();
 }
 
+export interface CreateConversationParams {
+  title?: string;
+  draftId?: string;
+  metadata?: {
+    entidade: string;
+    area: string;
+    tipologia: string;
+  };
+}
+
 export async function createConversation(
-  title?: string,
-  draftId?: string
+  params?: CreateConversationParams
 ): Promise<ConversationSummary> {
   const response = await fetch(`${API_URL}/conversations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, draftId }),
+    body: JSON.stringify(params || {}),
   });
   if (!response.ok) throw new Error("Failed to create conversation");
   return response.json();
